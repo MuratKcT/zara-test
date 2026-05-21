@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zara Webhook Tester</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 2rem; }
+    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; }
+    h1 span { color: #818cf8; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; }
+    label { display: block; font-size: 0.8rem; font-weight: 600; color: #94a3b8; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: .05em; }
+    input, textarea { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; padding: 0.6rem 0.8rem; font-size: 0.9rem; margin-bottom: 1rem; }
+    textarea { min-height: 100px; resize: vertical; font-family: inherit; }
+    input:focus, textarea:focus { outline: none; border-color: #818cf8; }
+    button { background: #4f46e5; color: #fff; border: none; border-radius: 8px; padding: 0.7rem 1.5rem; cursor: pointer; font-size: 0.95rem; font-weight: 600; width: 100%; transition: background .2s; }
+    button:hover { background: #6366f1; }
+    button:disabled { background: #334155; cursor: not-allowed; }
+    .drop-zone { border: 2px dashed #334155; border-radius: 8px; padding: 2rem; text-align: center; cursor: pointer; margin-bottom: 1rem; transition: border-color .2s; color: #64748b; }
+    .drop-zone:hover, .drop-zone.drag { border-color: #818cf8; color: #818cf8; }
+    .drop-zone img { max-height: 180px; border-radius: 6px; margin-top: 0.5rem; }
+    .response { font-family: 'Courier New', monospace; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all; max-height: 480px; overflow-y: auto; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1rem; margin-top: 1rem; }
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; margin-bottom: 0.75rem; }
+    .badge.ok  { background: #166534; color: #86efac; }
+    .badge.err { background: #7f1d1d; color: #fca5a5; }
+    .meta { font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem; }
+    .section-title { font-size: 1rem; font-weight: 700; color: #cbd5e1; margin-bottom: 1rem; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .spinner { display: none; border: 3px solid #334155; border-top-color: #818cf8; border-radius: 50%; width: 20px; height: 20px; animation: spin .7s linear infinite; margin: 0 auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<h1>Zara Webhook <span>Tester</span></h1>
+
+<div class="grid">
+
+  <!-- LEFT: Form -->
+  <div class="card">
+    <p class="section-title">Request</p>
+
+    <label>Webhook URL</label>
+    <input id="url" value="https://ai.vashausmishka.com/webhook/Zara">
+
+    <label>Message</label>
+    <textarea id="message" placeholder="Хочу голлівудську посмішку...">Хочу красиву посмішку, зуби жовтуваті та трохи криві</textarea>
+
+    <label>Patient data (optional)</label>
+    <div class="field-row">
+      <div>
+        <label style="text-transform:none;font-size:.75rem">Name</label>
+        <input id="pname" placeholder="Іванна Коваль">
+      </div>
+      <div>
+        <label style="text-transform:none;font-size:.75rem">Phone</label>
+        <input id="pphone" placeholder="+380991234567">
+      </div>
+    </div>
+    <div>
+      <label style="text-transform:none;font-size:.75rem">Email</label>
+      <input id="pemail" placeholder="test@gmail.com" style="margin-bottom:1rem">
+    </div>
+
+    <label>Image (optional)</label>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div id="dropLabel">Click or drag a JPEG here</div>
+      <input type="file" id="fileInput" accept="image/jpeg,image/png" style="display:none" onchange="handleFile(this.files[0])">
+    </div>
+
+    <button onclick="send()" id="sendBtn">Send to Zara</button>
+    <div class="spinner" id="spinner" style="margin-top:1rem"></div>
+  </div>
+
+  <!-- RIGHT: Response -->
+  <div class="card">
+    <p class="section-title">Response</p>
+    <div id="status"></div>
+    <div id="summary" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem;font-size:.85rem">
+        <div><span style="color:#94a3b8">Style:</span> <span id="r-style">—</span></div>
+        <div><span style="color:#94a3b8">Score:</span> <span id="r-score">—</span>/10</div>
+        <div><span style="color:#94a3b8">Color:</span> <span id="r-color">—</span></div>
+        <div><span style="color:#94a3b8">Price:</span> <span id="r-price">—</span></div>
+        <div style="grid-column:span 2"><span style="color:#94a3b8">Services:</span> <span id="r-services">—</span></div>
+        <div style="grid-column:span 2"><span style="color:#94a3b8">Doctors:</span>  <span id="r-doctors">—</span></div>
+        <div style="grid-column:span 2"><span style="color:#94a3b8">Duration:</span> <span id="r-duration">—</span></div>
+        <div style="grid-column:span 2"><span style="color:#94a3b8">Gen.Image:</span><span id="r-genimg">—</span></div>
+      </div>
+      <div id="afterImg" style="display:none;margin-bottom:.75rem">
+        <label>AI-generated smile</label>
+        <img id="genImgEl" style="width:100%;border-radius:8px">
+      </div>
+    </div>
+    <div class="response" id="response">Response will appear here...</div>
+  </div>
+
+</div>
+
+<script>
+  let imageBase64 = null;
+
+  // Drag & drop
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+  function handleFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const full = e.target.result;
+      imageBase64 = full.includes(',') ? full.split(',')[1] : full;
+      document.getElementById('dropLabel').innerHTML =
+        `<img src="${full}" alt="preview"><br><small>${file.name} (${(file.size/1024).toFixed(1)} KB)</small>`;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function send() {
+    const url     = document.getElementById('url').value.trim();
+    const message = document.getElementById('message').value.trim();
+    const pname   = document.getElementById('pname').value.trim();
+    const pphone  = document.getElementById('pphone').value.trim();
+    const pemail  = document.getElementById('pemail').value.trim();
+
+    let fullMessage = message;
+    if (pname || pphone || pemail) {
+      fullMessage += `\n[ДАНІ ПАЦІЄНТА]\nІм'я: ${pname}\nТел: ${pphone}\nEmail: ${pemail}`;
+    }
+
+    const payload = { message: fullMessage };
+    if (imageBase64) payload.image = imageBase64;
+
+    document.getElementById('sendBtn').disabled = true;
+    document.getElementById('spinner').style.display = 'block';
+    document.getElementById('status').innerHTML = '';
+    document.getElementById('summary').style.display = 'none';
+    document.getElementById('response').textContent = 'Waiting...';
+
+    const t0 = Date.now();
+    try {
+      const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const text = await res.text();
+      const ms   = Date.now() - t0;
+
+      document.getElementById('status').innerHTML =
+        `<span class="badge ${res.ok ? 'ok' : 'err'}">${res.status} ${res.statusText}</span>
+         <div class="meta">${ms}ms · ${text.length} bytes</div>`;
+
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch (_) {}
+
+      if (parsed && parsed.design) {
+        fillSummary(parsed);
+        document.getElementById('summary').style.display = 'block';
+      }
+
+      document.getElementById('response').textContent =
+        parsed ? JSON.stringify(parsed, null, 2) : text;
+
+    } catch (err) {
+      document.getElementById('status').innerHTML = `<span class="badge err">ERROR</span>`;
+      document.getElementById('response').textContent = err.message;
+    } finally {
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('spinner').style.display = 'none';
+    }
+  }
+
+  function fillSummary(body) {
+    const d = body.design || {};
+    const pv = d.patient_view || {};
+    const dv = d.doctor_view  || {};
+    const sa = d.current_smile_assessment || {};
+    document.getElementById('r-style').textContent    = d.design_style || '—';
+    document.getElementById('r-score').textContent    = sa.overall_score ?? '—';
+    document.getElementById('r-color').textContent    = sa.color_grade  || '—';
+    document.getElementById('r-price').textContent    = pv.estimated_price_range || '—';
+    document.getElementById('r-services').textContent = (pv.recommended_services || []).join(', ') || '—';
+    document.getElementById('r-doctors').textContent  = (dv.recommended_specialists || []).join(', ') || '—';
+    document.getElementById('r-duration').textContent = dv.treatment_duration || '—';
+
+    const gen = body.generated_image_base64;
+    if (gen) {
+      document.getElementById('r-genimg').textContent = `YES (${gen.length} chars)`;
+      document.getElementById('genImgEl').src = 'data:image/jpeg;base64,' + gen;
+      document.getElementById('afterImg').style.display = 'block';
+    } else {
+      document.getElementById('r-genimg').textContent = 'NO';
+      document.getElementById('afterImg').style.display = 'none';
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "zara-test",
+  "version": "1.0.0",
+  "description": "Test suite for Zara AI Smile Design workflow (n8n webhook)",
+  "main": "test.js",
+  "scripts": {
+    "test": "node test.js",
+    "test:text": "node test.js --scenario text-only",
+    "test:patient": "node test.js --scenario with-patient",
+    "test:image": "node test.js --scenario with-image",
+    "test:all": "node test.js --scenario all"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}
