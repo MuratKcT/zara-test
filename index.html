@@ -155,13 +155,21 @@
       let parsed = null;
       try { parsed = JSON.parse(text); } catch (_) {}
 
-      if (parsed && parsed.design) {
+      if (parsed) {
         fillSummary(parsed);
         document.getElementById('summary').style.display = 'block';
       }
 
-      document.getElementById('response').textContent =
-        parsed ? JSON.stringify(parsed, null, 2) : text;
+      // Exclude generated_image_base64 from display to avoid browser freeze on huge base64
+      if (parsed) {
+        const display = { ...parsed };
+        if (display.generated_image_base64) {
+          display.generated_image_base64 = `[base64 ${display.generated_image_base64.length} chars — hidden]`;
+        }
+        document.getElementById('response').textContent = JSON.stringify(display, null, 2);
+      } else {
+        document.getElementById('response').textContent = text;
+      }
 
     } catch (err) {
       document.getElementById('status').innerHTML = `<span class="badge err">ERROR</span>`;
