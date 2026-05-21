@@ -185,10 +185,20 @@
     document.getElementById('r-doctors').textContent  = (dv.recommended_specialists || []).join(', ') || '—';
     document.getElementById('r-duration').textContent = dv.treatment_duration || '—';
 
-    const gen = body.generated_image_base64;
-    if (gen) {
-      document.getElementById('r-genimg').textContent = `YES (${gen.length} chars)`;
-      document.getElementById('genImgEl').src = 'data:image/jpeg;base64,' + gen;
+    const raw = body.generated_image_base64;
+    if (raw) {
+      // Strip whitespace, resolve data URI prefix and MIME type
+      const clean = raw.replace(/\s/g, '');
+      let src;
+      if (clean.startsWith('data:')) {
+        src = clean;
+      } else {
+        // Detect PNG (iVBOR) vs JPEG (/9j/ → base64 starts with '/9j')
+        const mime = clean.startsWith('iVBOR') ? 'image/png' : 'image/jpeg';
+        src = `data:${mime};base64,${clean}`;
+      }
+      document.getElementById('r-genimg').textContent = '✅ Üretildi';
+      document.getElementById('genImgEl').src = src;
       document.getElementById('afterImg').style.display = 'block';
     } else {
       document.getElementById('r-genimg').textContent = 'NO';
