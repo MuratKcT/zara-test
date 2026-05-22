@@ -1,5 +1,10 @@
 node_modules/
 .env
-samples/*.jpg
-samples/*.jpeg
-samples/*.png
+
+# Workflow state dumps & API bodies (contain n8n API keys / tokens)
+zara_*.json
+*_state.json
+*_state_*.json
+*_put_body*.json
+*_verify*.json
+*_full.json
