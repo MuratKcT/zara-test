@@ -142,16 +142,44 @@
     document.getElementById('summary').style.display = 'none';
     document.getElementById('response').textContent = 'Waiting...';
 
+    // Revoke previous blob URL if any (free memory)
+    if (window.__lastGenImgUrl) { URL.revokeObjectURL(window.__lastGenImgUrl); window.__lastGenImgUrl = null; }
+
     const t0 = Date.now();
     try {
       const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const text = await res.text();
       const ms   = Date.now() - t0;
+      const ct   = res.headers.get('content-type') || '';
+      const buf  = await res.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+
+      // Detect binary image signatures in the raw response body
+      const isPNG  = bytes.length > 8 && bytes[0]===0x89 && bytes[1]===0x50 && bytes[2]===0x4E && bytes[3]===0x47;
+      const isJPEG = bytes.length > 3 && bytes[0]===0xFF && bytes[1]===0xD8 && bytes[2]===0xFF;
+      const isImageBinary = ct.startsWith('image/') || isPNG || isJPEG;
 
       document.getElementById('status').innerHTML =
         `<span class="badge ${res.ok ? 'ok' : 'err'}">${res.status} ${res.statusText}</span>
-         <div class="meta">${ms}ms · ${text.length} bytes</div>`;
+         <div class="meta">${ms}ms · ${buf.byteLength} bytes · ${ct || 'no content-type'}</div>`;
 
+      // ── Case A: Response IS the binary image ────────────────────────────
+      if (isImageBinary) {
+        const mime = isPNG ? 'image/png' : (isJPEG ? 'image/jpeg' : (ct || 'image/jpeg'));
+        const blob = new Blob([buf], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        window.__lastGenImgUrl = blobUrl;
+
+        document.getElementById('genImgEl').src = blobUrl;
+        document.getElementById('afterImg').style.display = 'block';
+        document.getElementById('r-genimg').textContent = `✅ Üretildi (binary ${(buf.byteLength/1024).toFixed(1)} KB)`;
+        document.getElementById('summary').style.display = 'block';
+        document.getElementById('response').textContent =
+          `[binary ${mime} — ${buf.byteLength} bytes]\nRendered directly from response blob.`;
+        return;
+      }
+
+      // ── Case B: Response is JSON (or text) ──────────────────────────────
+      const text   = new TextDecoder('utf-8').decode(buf);
       let parsed = null;
       try { parsed = JSON.parse(text); } catch (_) {}
 
@@ -160,11 +188,12 @@
         document.getElementById('summary').style.display = 'block';
       }
 
-      // Exclude generated_image_base64 from display to avoid browser freeze on huge base64
+      // Render the JSON, hiding huge base64 strings
       if (parsed) {
         const display = { ...parsed };
         if (display.generated_image_base64) {
-          display.generated_image_base64 = `[base64 ${display.generated_image_base64.length} chars — hidden]`;
+          const len = String(display.generated_image_base64).length;
+          display.generated_image_base64 = `[${len} chars — hidden in display]`;
         }
         document.getElementById('response').textContent = JSON.stringify(display, null, 2);
       } else {
@@ -193,23 +222,28 @@
     document.getElementById('r-doctors').textContent  = (dv.recommended_specialists || []).join(', ') || '—';
     document.getElementById('r-duration').textContent = dv.treatment_duration || '—';
 
+    // Image: only trust JSON base64 if it's substantial (>500 chars).
+    // Short strings (e.g. 13 chars) are n8n filesystem-mode binary references, not real data.
+    // The real image is rendered from the binary response blob in the main send() path.
     const raw = body.generated_image_base64;
-    if (raw) {
-      // Strip whitespace, resolve data URI prefix and MIME type
-      const clean = raw.replace(/\s/g, '');
+    const clean = typeof raw === 'string' ? raw.replace(/\s/g, '') : '';
+    if (clean.length > 500) {
       let src;
       if (clean.startsWith('data:')) {
         src = clean;
       } else {
-        // Detect PNG (iVBOR) vs JPEG (/9j/ → base64 starts with '/9j')
         const mime = clean.startsWith('iVBOR') ? 'image/png' : 'image/jpeg';
         src = `data:${mime};base64,${clean}`;
       }
-      document.getElementById('r-genimg').textContent = '✅ Üretildi';
+      document.getElementById('r-genimg').textContent = `✅ Üretildi (base64 ${clean.length} chars)`;
       document.getElementById('genImgEl').src = src;
       document.getElementById('afterImg').style.display = 'block';
+    } else if (clean.length > 0) {
+      // Truncated reference — image binary should be fetched via blob path
+      document.getElementById('r-genimg').textContent = `⚠️ JSON'da truncated (${clean.length} chars) — blob bekleniyor`;
+      document.getElementById('afterImg').style.display = 'none';
     } else {
-      document.getElementById('r-genimg').textContent = 'NO';
+      document.getElementById('r-genimg').textContent = '❌ Yok';
       document.getElementById('afterImg').style.display = 'none';
     }
   }
